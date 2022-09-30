@@ -52,7 +52,7 @@ def threshold_eq(a, b, threshold):
     return abs(a[0][0] - b[0][0]) < threshold and abs(a[0][1] - b[0][1]) < threshold
 
 def in_bounds(i, j, img):
-    return 0 <= i <= img.shape[0] and 0 <= j <= img.shape[1]
+    return 0 <= i < img.shape[0] and 0 <= j < img.shape[1]
 def near_points(dot, img):
     dot = dot[0]
     neighbors = [[],[]]
@@ -91,7 +91,7 @@ def _build_impl(frame_sequence: pims.FramesSequence,
         n = 0
         if p1 is not None:
             good_new = p1[st.reshape(-1)==1]
-            old_ids = corners_0._ids[st.reshape(-1)==1]
+            old_ids = corners_0._ids[st.reshape(-1)==1].reshape(-1)
             n = len(good_new)
 
         mask = np.ones_like(image_1, dtype=np.uint8)
@@ -102,8 +102,9 @@ def _build_impl(frame_sequence: pims.FramesSequence,
         if N != n:
             arr_corners = cv2.goodFeaturesToTrack(image_1, N - n, 0.01, 5, mask=mask)
             arr_corners = np.concatenate([good_new, arr_corners])
+            arr_ids = np.concatenate([old_ids, np.array(range(ids_amount, ids_amount + N - n))])
             corners_1 = FrameCorners(
-                np.array(old_ids + range(ids_amount, ids_amount + N - n)), # id треков
+                np.array(arr_ids), # id треков
                 np.array(arr_corners), # положение уголков
                 np.array([5] * N) # размер уголка
             )
@@ -115,7 +116,7 @@ def _build_impl(frame_sequence: pims.FramesSequence,
                 np.array([5] * N) # размер уголка
             )
         ids_amount += N - n
-        builder.set_corners_at_frame(0, corners_1)
+        builder.set_corners_at_frame(frame, corners_1)
         corners_0 = corners_1
 
 
