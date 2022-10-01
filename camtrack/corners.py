@@ -55,10 +55,14 @@ def in_bounds(i, j, img):
     return 0 <= i < img.shape[0] and 0 <= j < img.shape[1]
 
 
-def near_points(dot, img):
+def near_points(dot, img, size):
     dot = dot[0]
     neighbors = [[], []]
-    delta = [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1], [0, 0]]
+    delta = []
+    for i in range(-size // 2, size // 2):
+        for j in range(-size // 2, size // 2):
+            delta.append([i, j])
+    # delta = [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1], [0, 0]]
     i = int(dot[0])
     j = int(dot[1])
     for d in delta:
@@ -73,9 +77,9 @@ def _build_impl(frame_sequence: pims.FramesSequence,
     N = 200
     ids_amount = N
     image_0 = frame_sequence[0]
-    arr_corners = cv2.goodFeaturesToTrack(image_0, N, 0.01, 20)
+    arr_corners = cv2.goodFeaturesToTrack(image_0, N, 0.01, 10)
     corners_0 = FrameCorners(
-        np.array(range(N)),  # id треков
+        np.array(range(len(arr_corners))),  # id треков
         np.array(arr_corners),  # положение уголков
         np.array([5] * len(arr_corners))  # размер уголка
     )
@@ -97,11 +101,11 @@ def _build_impl(frame_sequence: pims.FramesSequence,
 
         mask = np.ones_like(image_1, dtype=np.uint8)
         for dot in good_new:
-            mask1 = near_points(dot, image_1)
+            mask1 = near_points(dot, image_1, 20)
             mask[mask1[0], mask1[1]] = 0
         add_n = 0
         if n < N:
-            arr_corners = cv2.goodFeaturesToTrack(image_1, N - n, 0.01, 20, mask=mask)
+            arr_corners = cv2.goodFeaturesToTrack(image_1, N - n, 0.01, 10, mask=mask)
             add_n = len(arr_corners)
             arr_corners = np.concatenate([good_new, arr_corners])
             arr_ids = np.concatenate([old_ids, np.array(range(ids_amount, ids_amount + add_n))])
