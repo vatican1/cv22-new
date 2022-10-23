@@ -41,24 +41,36 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
     )
 
     # давайе сначала получим облако 3d точек
-    correspondences = build_correspondences(corner_storage[known_view_1[0]], corner_storage[known_view_2[0]]) # посмотрели на соответствия 2d точек
+    correspondences = build_correspondences(corner_storage[known_view_1[0]],
+                                            corner_storage[known_view_2[0]])  # посмотрели на соответствия 2d точек
     points_3d = triangulate_correspondences(correspondences,
-                                pose_to_view_mat3x4(known_view_1[1]),
-                                pose_to_view_mat3x4(known_view_2[1]),
-                                intrinsic_mat,
-                                TriangulationParameters(1000, 0, 0)
-                                ) # трианглулировали соответствия
+                                            pose_to_view_mat3x4(known_view_1[1]),
+                                            pose_to_view_mat3x4(known_view_2[1]),
+                                            intrinsic_mat,
+                                            TriangulationParameters(1000, 0, 0)
+                                            )  # трианглулировали соответствия
 
     # теперь у нас есть набор 3d точек, дальше имея знания о них необходимо искать положения камеры
     # Давайте сначала попробуем найти положение камеры в каждом 20 - ом кадре, а потом имея эту информацию будем уточнять положения во всех промежуточных кадрах
 
     # для начала напишем код просто для 20-ого кадра
-    cv2.solvePnPRansac()
+    next_scene = 20  # тут надо написать код в духе не 20 кадр, а самый старший кадр из данных +20, если так нельзя то -20
+
+    ids_3d = points_3d[1]  # id точек, для которых необходимо решать задачу pnp
+    ids_2d = corner_storage[next_scene].ids
+    intersect_ids = np.intersect1d(ids_3d, ids_2d)
+    mask_3d = np.in1d(ids_3d, intersect_ids)
+    mask_2d = np.in1d(ids_2d, intersect_ids)
 
 
-    # TODO: implement
+    retval, rvec, tvec, inliers = cv2.solvePnPRansac(points_3d[0][mask_3d],
+                                                     corner_storage[next_scene].points[mask_2d],
+                                                     intrinsic_mat,
+                                                     np.array([])
+                                                     )
+
     frame_count = len(corner_storage)
-    view_mats = [pose_to_view_mat3x4(known_view_1[1])] * frame_count # пока что типо камера стоит
+    view_mats = [pose_to_view_mat3x4(known_view_1[1])] * frame_count  # пока что типо камера стоит
     corners_0 = corner_storage[0]
     point_cloud_builder = PointCloudBuilder(corners_0.ids[:1],
                                             np.zeros((1, 3)))
