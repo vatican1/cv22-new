@@ -28,7 +28,7 @@ from _corners import (
     calc_track_interval_mappings,
     calc_track_len_array_mapping,
     without_short_tracks,
-    create_cli, draw_track
+    create_cli
 )
 
 

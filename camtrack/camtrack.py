@@ -6,6 +6,7 @@ __all__ = [
 
 from typing import List, Optional, Tuple
 
+import cv2
 import numpy as np
 
 from corners import CornerStorage
@@ -17,7 +18,10 @@ from _camtrack import (
     calc_point_cloud_colors,
     pose_to_view_mat3x4,
     to_opencv_camera_mat3x3,
-    view_mat3x4_to_pose
+    view_mat3x4_to_pose,
+    build_correspondences,
+    triangulate_correspondences,
+    TriangulationParameters
 )
 
 
@@ -36,9 +40,25 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
         rgb_sequence[0].shape[0]
     )
 
+    # давайе сначала получим облако 3d точек
+    correspondences = build_correspondences(corner_storage[known_view_1[0]], corner_storage[known_view_2[0]]) # посмотрели на соответствия 2d точек
+    points_3d = triangulate_correspondences(correspondences,
+                                pose_to_view_mat3x4(known_view_1[1]),
+                                pose_to_view_mat3x4(known_view_2[1]),
+                                intrinsic_mat,
+                                TriangulationParameters(1000, 0, 0)
+                                ) # трианглулировали соответствия
+
+    # теперь у нас есть набор 3d точек, дальше имея знания о них необходимо искать положения камеры
+    # Давайте сначала попробуем найти положение камеры в каждом 20 - ом кадре, а потом имея эту информацию будем уточнять положения во всех промежуточных кадрах
+
+    # для начала напишем код просто для 20-ого кадра
+    cv2.solvePnPRansac()
+
+
     # TODO: implement
     frame_count = len(corner_storage)
-    view_mats = [pose_to_view_mat3x4(known_view_1[1])] * frame_count
+    view_mats = [pose_to_view_mat3x4(known_view_1[1])] * frame_count # пока что типо камера стоит
     corners_0 = corner_storage[0]
     point_cloud_builder = PointCloudBuilder(corners_0.ids[:1],
                                             np.zeros((1, 3)))
