@@ -21,7 +21,8 @@ from _camtrack import (
     view_mat3x4_to_pose,
     build_correspondences,
     triangulate_correspondences,
-    TriangulationParameters
+    TriangulationParameters,
+    rodrigues_and_translation_to_view_mat3x4
 )
 
 
@@ -62,12 +63,13 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
     mask_3d = np.in1d(ids_3d, intersect_ids)
     mask_2d = np.in1d(ids_2d, intersect_ids)
 
-
-    retval, rvec, tvec, inliers = cv2.solvePnPRansac(points_3d[0][mask_3d],
+    retval, r_vec, t_vec, inliers = cv2.solvePnPRansac(points_3d[0][mask_3d],
                                                      corner_storage[next_scene].points[mask_2d],
                                                      intrinsic_mat,
                                                      np.array([])
                                                      )
+    new_view_mat_by_prev_position = rodrigues_and_translation_to_view_mat3x4(r_vec, t_vec) # получили view матрицу относительно предыдущей позиции камеры, теперь надо сделать её относительно начального положения
+    new_view_mat = new_view_mat_by_prev_position # TODO написать что нужно чтобы получить view матрицу относительно начальног оположения камеры
 
     frame_count = len(corner_storage)
     view_mats = [pose_to_view_mat3x4(known_view_1[1])] * frame_count  # пока что типо камера стоит
