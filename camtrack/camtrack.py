@@ -41,41 +41,86 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
         rgb_sequence[0].shape[0]
     )
 
-    # давайе сначала получим облако 3d точек
+    def pnp_by_frame_number(points_3d, next_scene: int):
+        ids_3d = points_3d[1]  # id точек, для которых необходимо решать задачу pnp
+        ids_2d = corner_storage[next_scene].ids
+        intersect_ids = np.intersect1d(ids_3d, ids_2d)  # пересекли по id 3d и 2d точки
+        mask_3d = np.in1d(ids_3d, intersect_ids)
+        mask_2d = np.in1d(ids_2d, intersect_ids)
+        return cv2.solvePnPRansac(points_3d[0][mask_3d],
+                                  corner_storage[next_scene].points[mask_2d],
+                                  intrinsic_mat,
+                                  np.array([])
+                                  )
+
+    # давайте сначала получим облако 3d точек
     correspondences = build_correspondences(corner_storage[known_view_1[0]],
                                             corner_storage[known_view_2[0]])  # посмотрели на соответствия 2d точек
-    points_3d = triangulate_correspondences(correspondences,
-                                            pose_to_view_mat3x4(known_view_1[1]),
-                                            pose_to_view_mat3x4(known_view_2[1]),
-                                            intrinsic_mat,
-                                            TriangulationParameters(1000, 0, 0)
-                                            )  # трианглулировали соответствия
+    new_points_3d, ids, median_cos = triangulate_correspondences(correspondences,
+                                                                 pose_to_view_mat3x4(known_view_1[1]),
+                                                                 pose_to_view_mat3x4(known_view_2[1]),
+                                                                 intrinsic_mat,
+                                                                 TriangulationParameters(1000, 0, 0)
+                                                                 )  # сделали триангуляцию соответствия
 
-    # теперь у нас есть набор 3d точек, дальше имея знания о них необходимо искать положения камеры
-    # Давайте сначала попробуем найти положение камеры в каждом 20 - ом кадре, а потом имея эту информацию будем уточнять положения во всех промежуточных кадрах
+    storage_points_3d = [new_points_3d, ids]  # тут храним все полученные 3d точки
+    # будем идти по 20 кадров и добавлять 3d точки
+    # идём вправо
+    shift = 15
+    if max(known_view_1[0], known_view_2[0]) + shift < len(corner_storage):
+        right_frame_number = max(known_view_1[0], known_view_2[0])
+        prev_view = known_view_1[1] if known_view_1[0] == right_frame_number else known_view_2[1]
+        prev_view_mat = pose_to_view_mat3x4(prev_view)
+        for i in range(right_frame_number + shift, len(corner_storage), shift):
+            # 1 - определяем позицию камеры на этом кадре
+            # 2 - доставляем 3d точки, которые можем доставить
+            retval, r_vec, t_vec, inliers = pnp_by_frame_number(storage_points_3d, i)
+            next_view_mat = rodrigues_and_translation_to_view_mat3x4(r_vec,
+                                                                     t_vec)  # определили позицию камеры на данном кадре
+            correspondences = build_correspondences(corner_storage[right_frame_number], corner_storage[i])
+            new_points_3d, ids, median_cos = triangulate_correspondences(correspondences,
+                                                                         prev_view_mat,
+                                                                         next_view_mat,
+                                                                         intrinsic_mat,
+                                                                         TriangulationParameters(1000, 0, 0)
+                                                                         )
+            # добавим только новые 3d точки
+            new_3d_points_mask = np.array([True if i not in storage_points_3d[1] else False for i in ids])
+            storage_points_3d[0] = np.vstack((storage_points_3d[0], new_points_3d[new_3d_points_mask]))
+            storage_points_3d[1] = np.hstack((storage_points_3d[1], ids[new_3d_points_mask]))
+            right_frame_number += shift
+            prev_view_mat = next_view_mat
 
-    # для начала напишем код просто для 20-ого кадра
-    next_scene = 20  # тут надо написать код в духе не 20 кадр, а самый старший кадр из данных +20, если так нельзя то -20
+    if min(known_view_1[0], known_view_2[0]) - shift > 0:
+        left_frame_number = min(known_view_1[0], known_view_2[0])
+        prev_view = known_view_1[1] if known_view_1[0] == left_frame_number else known_view_2[1]
+        prev_view_mat = pose_to_view_mat3x4(prev_view)
+        for i in range(left_frame_number - shift, -1, -shift):
+            retval, r_vec, t_vec, inliers = pnp_by_frame_number(storage_points_3d, i)
+            next_view_mat = rodrigues_and_translation_to_view_mat3x4(r_vec, t_vec)
+            correspondences = build_correspondences(corner_storage[left_frame_number], corner_storage[i])
+            new_points_3d, ids, median_cos = triangulate_correspondences(correspondences,
+                                                                         prev_view_mat,
+                                                                         next_view_mat,
+                                                                         intrinsic_mat,
+                                                                         TriangulationParameters(1000, 0, 0)
+                                                                         )
+            # добавим только новые 3d точки
+            new_3d_points_mask = np.array([True if i not in storage_points_3d[1] else False for i in ids])
+            storage_points_3d[0] = np.vstack((storage_points_3d[0], new_points_3d[new_3d_points_mask]))
+            storage_points_3d[1] = np.hstack((storage_points_3d[1], ids[new_3d_points_mask]))
+            left_frame_number -= shift
+            prev_view_mat = next_view_mat
 
-    ids_3d = points_3d[1]  # id точек, для которых необходимо решать задачу pnp
-    ids_2d = corner_storage[next_scene].ids
-    intersect_ids = np.intersect1d(ids_3d, ids_2d)
-    mask_3d = np.in1d(ids_3d, intersect_ids)
-    mask_2d = np.in1d(ids_2d, intersect_ids)
+    # в итоге после этих операций у нас есть облако 3d точек, для которых можно решать pnp для каждого кадра
 
-    retval, r_vec, t_vec, inliers = cv2.solvePnPRansac(points_3d[0][mask_3d],
-                                                     corner_storage[next_scene].points[mask_2d],
-                                                     intrinsic_mat,
-                                                     np.array([])
-                                                     )
-    new_view_mat_by_prev_position = rodrigues_and_translation_to_view_mat3x4(r_vec, t_vec) # получили view матрицу относительно предыдущей позиции камеры, теперь надо сделать её относительно начального положения
-    new_view_mat = new_view_mat_by_prev_position # TODO написать что нужно чтобы получить view матрицу относительно начальног оположения камеры
+    view_mats = []
+    for i in range(len(corner_storage)):
+        retval, r_vec, t_vec, inliers = pnp_by_frame_number(storage_points_3d, i)
+        view_mats.append(rodrigues_and_translation_to_view_mat3x4(r_vec, t_vec))
 
-    frame_count = len(corner_storage)
-    view_mats = [pose_to_view_mat3x4(known_view_1[1])] * frame_count  # пока что типо камера стоит
-    corners_0 = corner_storage[0]
-    point_cloud_builder = PointCloudBuilder(corners_0.ids[:1],
-                                            np.zeros((1, 3)))
+    point_cloud_builder = PointCloudBuilder(storage_points_3d[1], # id всех найденных 3d точек
+                                            storage_points_3d[0])
 
     calc_point_cloud_colors(
         point_cloud_builder,
