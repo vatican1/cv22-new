@@ -52,7 +52,7 @@ def threshold_eq(a, b, threshold):
 
 
 def in_bounds(i, j, img):
-    return 0 <= i < img.shape[0] and 0 <= j < img.shape[1]
+    return 0 <= i < img.shape[1] and 0 <= j < img.shape[0]
 
 
 def near_points(dot, img, size):
@@ -74,6 +74,7 @@ def near_points(dot, img, size):
 
 def _build_impl(frame_sequence: pims.FramesSequence,
                 builder: _CornerStorageBuilder) -> None:
+    corners_1 = None
     N = 200
     ids_amount = N
     image_0 = frame_sequence[0]
@@ -99,12 +100,12 @@ def _build_impl(frame_sequence: pims.FramesSequence,
             old_ids = corners_0._ids[st.reshape(-1) == 1].reshape(-1)
             n = len(good_new)
 
-        mask = np.ones_like(image_1, dtype=np.uint8)
-        for dot in good_new:
-            mask1 = near_points(dot, image_1, 20)
-            mask[mask1[0], mask1[1]] = 0
         add_n = 0
         if n < N:
+            mask = np.ones_like(image_1, dtype=np.uint8)
+            for dot in good_new:
+                mask1 = near_points(dot, image_1, 20)
+                mask[mask1[1], mask1[0]] = 0
             arr_corners = cv2.goodFeaturesToTrack(image_1, N - n, 0.01, 10, mask=mask)
             add_n = len(arr_corners)
             arr_corners = np.concatenate([good_new, arr_corners])
