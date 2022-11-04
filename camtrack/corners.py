@@ -78,7 +78,7 @@ def _build_impl(frame_sequence: pims.FramesSequence,
     N = 200
     ids_amount = N
     image_0 = frame_sequence[0]
-    arr_corners = cv2.goodFeaturesToTrack(image_0, N, 0.01, 10)
+    arr_corners = cv2.goodFeaturesToTrack(image_0, N, 0.005, 10)
     corners_0 = FrameCorners(
         np.array(range(len(arr_corners))),  # id треков
         np.array(arr_corners),  # положение уголков
@@ -106,7 +106,7 @@ def _build_impl(frame_sequence: pims.FramesSequence,
             for dot in good_new:
                 mask1 = near_points(dot, image_1, 20)
                 mask[mask1[1], mask1[0]] = 0
-            arr_corners = cv2.goodFeaturesToTrack(image_1, N - n, 0.01, 10, mask=mask)
+            arr_corners = cv2.goodFeaturesToTrack(image_1, N - n, 0.005, 10, mask=mask)
             add_n = len(arr_corners)
             arr_corners = np.concatenate([good_new, arr_corners])
             arr_ids = np.concatenate([old_ids, np.array(range(ids_amount, ids_amount + add_n))])
