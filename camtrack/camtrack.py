@@ -240,8 +240,7 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
                                                                                          False)
                 if not retval:
                     print("Не получилось решить PnP в методе ретриангуляции")
-                rodrigues_and_translation_to_view_mat3x4(r_vec, t_vec)
-                mats.append(rodrigues_and_translation_to_view_mat3x4(r_vec, t_vec))
+                mats.append(intrinsic_mat @ rodrigues_and_translation_to_view_mat3x4(r_vec, t_vec))
             for id_2d in intersection_ids:
                 points_2d = select_2d_points(id_2d, arr_frames)
                 point_3d = triangulate_nviews(mats, points_2d)
@@ -251,13 +250,13 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
             print("не те кадры для ретриангуляции")
 
 
-    # storage_points_3d_old = storage_points_3d
-    # min_retr = min_
-    # while min_retr + 4 * default_shift < len(corner_storage):
-    #     arr_frames_ = [min_retr + i * default_shift for i in range(4)]
-    #     retriangle(arr_frames_)
-    #     min_retr += default_shift
-    # assert(storage_points_3d_old == storage_points_3d) # хочу проверить, что ретриангуляция вообще что-то поменяла
+    storage_points_3d_old = storage_points_3d
+    min_retr = min_
+    while min_retr + 4 * default_shift < len(corner_storage):
+        arr_frames_ = [min_retr + i * default_shift for i in range(4)]
+        retriangle(arr_frames_)
+        min_retr += default_shift
+    assert(storage_points_3d_old == storage_points_3d) # хочу проверить, что ретриангуляция вообще что-то поменяла
 
     # закончили с ретриангуляцией, пробуем найти итоговые положения
     view_mats = []
