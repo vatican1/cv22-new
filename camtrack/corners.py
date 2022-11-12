@@ -59,8 +59,8 @@ def near_points(dot, img, size):
     dot = dot[0]
     neighbors = [[], []]
     delta = []
-    for i in range(-size // 2, size // 2):
-        for j in range(-size // 2, size // 2):
+    for i in range(-size, size + 1):
+        for j in range(-size, size + 1):
             delta.append([i, j])
     # delta = [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1], [0, 0]]
     i = int(dot[0])
@@ -75,10 +75,11 @@ def near_points(dot, img, size):
 def _build_impl(frame_sequence: pims.FramesSequence,
                 builder: _CornerStorageBuilder) -> None:
     corners_1 = None
-    N = 200
+    N = 400
+    mask_size = 10
     ids_amount = N
     image_0 = frame_sequence[0]
-    arr_corners = cv2.goodFeaturesToTrack(image_0, N, 0.005, 10)
+    arr_corners = cv2.goodFeaturesToTrack(image_0, N + 100, 0.005, mask_size)
     corners_0 = FrameCorners(
         np.array(range(len(arr_corners))),  # id треков
         np.array(arr_corners),  # положение уголков
@@ -104,17 +105,25 @@ def _build_impl(frame_sequence: pims.FramesSequence,
         if n < N:
             mask = np.ones_like(image_1, dtype=np.uint8)
             for dot in good_new:
-                mask1 = near_points(dot, image_1, 20)
+                mask1 = near_points(dot, image_1, mask_size)
                 mask[mask1[1], mask1[0]] = 0
-            arr_corners = cv2.goodFeaturesToTrack(image_1, N - n, 0.005, 10, mask=mask)
-            add_n = len(arr_corners)
-            arr_corners = np.concatenate([good_new, arr_corners])
-            arr_ids = np.concatenate([old_ids, np.array(range(ids_amount, ids_amount + add_n))])
-            corners_1 = FrameCorners(
-                np.array(arr_ids),  # id треков
-                np.array(arr_corners),  # положение уголков
-                np.array([5] * len(arr_ids))  # размер уголка
-            )
+            arr_corners = cv2.goodFeaturesToTrack(image_1, N - n, 0.01, mask_size, mask=mask)
+            if arr_corners is not None:
+                add_n = len(arr_corners)
+                arr_corners = np.concatenate([good_new, arr_corners])
+                arr_ids = np.concatenate([old_ids, np.array(range(ids_amount, ids_amount + add_n))])
+                corners_1 = FrameCorners(
+                    np.array(arr_ids),  # id треков
+                    np.array(arr_corners),  # положение уголков
+                    np.array([5] * len(arr_ids))  # размер уголка
+                )
+            else:
+                arr_corners = good_new
+                corners_1 = FrameCorners(
+                    np.array(old_ids),  # id треков
+                    np.array(good_new),  # положение уголков
+                    np.array([5] * len(old_ids))  # размер уголка
+                )
         else:
             arr_corners = good_new
             corners_1 = FrameCorners(

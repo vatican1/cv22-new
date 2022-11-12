@@ -122,7 +122,6 @@ Correspondences = namedtuple(
     ('ids', 'points_1', 'points_2')
 )
 
-
 TriangulationParameters = namedtuple(
     'TriangulationParameters',
     ('max_reprojection_error', 'min_triangulation_angle_deg', 'min_depth')
@@ -252,8 +251,13 @@ def rodrigues_and_translation_to_view_mat3x4(r_vec: np.ndarray,
     return view_mat
 
 
-class PointCloudBuilder:
+def view_mat3x4_to_rodrigues_and_translation(view_mat: np.ndarray) -> (np.ndarray, np.ndarray):
+    t_vec = view_mat[:, 3].reshape(1, 3)  # .flatten()
+    r_vec = cv2.Rodrigues(view_mat[:, :3])[0]
+    return r_vec, t_vec
 
+
+class PointCloudBuilder:
     __slots__ = ('_ids', '_points', '_colors')
 
     def __init__(self, ids: np.ndarray = None, points: np.ndarray = None,
@@ -382,11 +386,11 @@ def calc_point_cloud_colors(pc_builder: PointCloudBuilder,
                 errors = np.nan_to_num(errors)
 
             consistency_mask = (
-                (errors <= max_reproj_error) &
-                (corners.points[:, 0] >= 0) &
-                (corners.points[:, 1] >= 0) &
-                (corners.points[:, 0] < image.shape[1] - 0.5) &
-                (corners.points[:, 1] < image.shape[0] - 0.5)).flatten()
+                    (errors <= max_reproj_error) &
+                    (corners.points[:, 0] >= 0) &
+                    (corners.points[:, 1] >= 0) &
+                    (corners.points[:, 0] < image.shape[1] - 0.5) &
+                    (corners.points[:, 1] < image.shape[0] - 0.5)).flatten()
             ids_to_process = corners.ids[consistency_mask].flatten()
             corner_points = np.round(
                 corners.points[consistency_mask]
@@ -481,4 +485,5 @@ def create_cli(track_and_calc_colors):
                     frame += 1
                 if key == 'q':
                     break
+
     return cli
