@@ -75,11 +75,11 @@ def near_points(dot, img, size):
 def _build_impl(frame_sequence: pims.FramesSequence,
                 builder: _CornerStorageBuilder) -> None:
     corners_1 = None
-    N = 400
-    mask_size = 10
+    N = 180
+    mask_size = 6
     ids_amount = N
     image_0 = frame_sequence[0]
-    arr_corners = cv2.goodFeaturesToTrack(image_0, N + 100, 0.005, mask_size)
+    arr_corners = cv2.goodFeaturesToTrack(image_0, N, 0.32, mask_size)
     corners_0 = FrameCorners(
         np.array(range(len(arr_corners))),  # id треков
         np.array(arr_corners),  # положение уголков
@@ -87,13 +87,15 @@ def _build_impl(frame_sequence: pims.FramesSequence,
     )
 
     builder.set_corners_at_frame(0, corners_0)
+    lks = dict(winSize=(20, 20), maxLevel=4, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 0.1))
     for frame, image_1 in enumerate(frame_sequence[1:], 1):
 
         p1, st, err = cv2.calcOpticalFlowPyrLK(
             np.uint8(image_0 * 255. / image_0.max()),
             np.uint8(image_1 * 255. / image_1.max()),
             arr_corners,
-            None
+            None,
+            **lks,
         )
         n = 0
         if p1 is not None:
@@ -107,7 +109,7 @@ def _build_impl(frame_sequence: pims.FramesSequence,
             for dot in good_new:
                 mask1 = near_points(dot, image_1, mask_size)
                 mask[mask1[1], mask1[0]] = 0
-            arr_corners = cv2.goodFeaturesToTrack(image_1, N - n, 0.01, mask_size, mask=mask)
+            arr_corners = cv2.goodFeaturesToTrack(image_1, N - n, 0.32, mask_size, mask=mask)
             if arr_corners is not None:
                 add_n = len(arr_corners)
                 arr_corners = np.concatenate([good_new, arr_corners])

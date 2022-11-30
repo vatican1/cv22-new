@@ -164,17 +164,17 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
         view_mat = rodrigues_and_translation_to_view_mat3x4(r_vec, t_vec)
         arr_bi.append((middle_, max_, view_mat, pose_to_view_mat3x4(known_view_2[1])))
         # arr_bi.append((min_, middle_, pose_to_view_mat3x4(known_view_1[1]), view_mat))
-    # if min_ > 5:
-    #     retval, r_vec, t_vec, ids_outliers = pnp_by_frame_number(storage_points_3d, min_ // 2, False)
-    #     if retval:
-    #         view_mat = rodrigues_and_translation_to_view_mat3x4(r_vec, t_vec)
-    #         arr_bi.append((min_ // 2, min_, view_mat, pose_to_view_mat3x4(known_view_1[1])))
+    if min_ > 5:
+        retval, r_vec, t_vec, ids_outliers = pnp_by_frame_number(storage_points_3d, min_ // 2, False)
+        if retval:
+            view_mat = rodrigues_and_translation_to_view_mat3x4(r_vec, t_vec)
+            arr_bi.append((min_ // 2, min_, view_mat, pose_to_view_mat3x4(known_view_1[1])))
 
     for params in arr_bi:
         solve_somewhere(*params)
 
     # будем идти по shift кадров и добавлять 3d точки
-    default_shift = abs(known_view_1[0] - known_view_2[0]) // 2
+    default_shift = 50  # abs(known_view_1[0] - known_view_2[0]) // 2
     shift = default_shift
     # идём вправо
     if max(known_view_1[0], known_view_2[0]) + shift < len(corner_storage):
@@ -192,7 +192,7 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
                 i -= shift
                 shift = shift // 2
                 i += shift
-                if shift == 0:
+                if shift < 4:
                     print(
                         "Не удалось найти соседний кадр для увеличения успешного решения задачи PnP для увеличения облака точек")
                     shift = default_shift
@@ -250,23 +250,23 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
             print("не те кадры для ретриангуляции")
 
 
-    storage_points_3d_old = storage_points_3d
-    min_retr = min_
-    while min_retr + 4 * default_shift < len(corner_storage):
-        arr_frames_ = [min_retr + i * default_shift for i in range(4)]
-        retriangle(arr_frames_)
-        min_retr += default_shift
-    assert(storage_points_3d_old == storage_points_3d) # хочу проверить, что ретриангуляция вообще что-то поменяла
+    # storage_points_3d_old = storage_points_3d
+    # min_retr = min_
+    # while min_retr + 4 * default_shift < len(corner_storage):
+    #     arr_frames_ = [min_retr + i * default_shift for i in range(4)]
+    #     retriangle(arr_frames_)
+    #     min_retr += default_shift
+    # assert(storage_points_3d_old == storage_points_3d) # хочу проверить, что ретриангуляция вообще что-то поменяла
 
     # закончили с ретриангуляцией, пробуем найти итоговые положения
     view_mats = []
-    t_vec_prev = None
-    r_vec_prev = None
-    # r_vec_prev = view_mat3x4_to_rodrigues_and_translation(pose_to_view_mat3x4(known_view_1[1]))[0]
-    # t_vec_prev = view_mat3x4_to_rodrigues_and_translation(pose_to_view_mat3x4(known_view_1[1]))[1]
+    # t_vec_prev = None
+    # r_vec_prev = None
+    r_vec_prev = view_mat3x4_to_rodrigues_and_translation(pose_to_view_mat3x4(known_view_1[1]))[0]
+    t_vec_prev = view_mat3x4_to_rodrigues_and_translation(pose_to_view_mat3x4(known_view_1[1]))[1]
     storage_points_3d[2] = np.array([True] * storage_points_3d[0].shape[0])
     standart_repr_error = 2
-    max_repr_error = 100
+    max_repr_error = 9
     rep_error = standart_repr_error
     # for i in range(len(corner_storage)):
     i = 0
@@ -274,7 +274,7 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
         retval, r_vec, t_vec, ids_outliers = pnp_by_frame_number(storage_points_3d, i, True,
                                                                  t_vec_prev, r_vec_prev, True,
                                                                  rep_error)
-        if not retval:  # если не получается пробуем доделать хоть как-то
+        if not retval:  # or ids_outliers.size < 10 если не получается пробуем доделать хоть как-то
             rep_error += 1
             if rep_error > max_repr_error:
                 print("Не удалось решить PnP для поиска итогового положения камеры в кадре", i)
