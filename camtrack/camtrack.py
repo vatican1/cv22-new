@@ -265,8 +265,8 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
     r_vec_prev = view_mat3x4_to_rodrigues_and_translation(pose_to_view_mat3x4(known_view_1[1]))[0]
     t_vec_prev = view_mat3x4_to_rodrigues_and_translation(pose_to_view_mat3x4(known_view_1[1]))[1]
     storage_points_3d[2] = np.array([True] * storage_points_3d[0].shape[0])
-    standart_repr_error = 2
-    max_repr_error = 9
+    standart_repr_error = 3
+    max_repr_error = 8
     rep_error = standart_repr_error
     # for i in range(len(corner_storage)):
     i = 0
@@ -283,6 +283,11 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
 
         for j in ids_outliers:
             storage_points_3d[2][np.argwhere(storage_points_3d[1] == j)[0, 0]] = False
+        # if np.linalg.norm(r_vec - r_vec_prev) > 0.001:
+        # if i > 3:
+        #     r_vec = r_vec_prev
+        #     t_vec = t_vec_prev
+
         t_vec_prev, r_vec_prev = t_vec, r_vec
         view_mats.append(rodrigues_and_translation_to_view_mat3x4(r_vec, t_vec))
         if rep_error > standart_repr_error:  # если заработало, пробуем опять с жёсткими ограничениями
