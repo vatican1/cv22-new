@@ -75,7 +75,7 @@ def near_points(dot, img, size):
 def _build_impl(frame_sequence: pims.FramesSequence,
                 builder: _CornerStorageBuilder) -> None:
     corners_1 = None
-    N = 300
+    N = 600
     mask_size = 5
     ids_amount = N
     image_0 = frame_sequence[0]
