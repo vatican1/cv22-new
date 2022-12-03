@@ -22,7 +22,7 @@ from _camtrack import (
     build_correspondences,
     triangulate_correspondences,
     TriangulationParameters,
-    rodrigues_and_translation_to_view_mat3x4, view_mat3x4_to_rodrigues_and_translation
+    rodrigues_and_translation_to_view_mat3x4, view_mat3x4_to_rodrigues_and_translation, eye3x4
 )
 
 
@@ -36,20 +36,60 @@ def triangulate_nviews(mats, points):
     return A / A[3]
 
 
+def calculate_for_2_frames(intrinsic_mat: np.ndarray,
+                           corner_storage: CornerStorage,
+                           first_frame: int,
+                           second_frame: int):
+    correspondences = build_correspondences(corner_storage[first_frame],
+                                            corner_storage[second_frame])
+    H, mask_homography = cv2.findHomography(correspondences.points_1, correspondences.points_2, cv2.RANSAC)
+
+    E, mask_essential = cv2.findEssentialMat(correspondences.points_1, correspondences.points_2,
+                                             intrinsic_mat, cv2.RANSAC, 0.999, 1.0)
+    if mask_homography.mean() > mask_essential.mean():
+        return -1, None, None
+
+    essential_inliers_idx = np.arange(len(mask_essential))[mask_essential.flatten().astype(dtype=bool)]
+
+    retval, R, t, mask = cv2.recoverPose(E, correspondences.points_1[essential_inliers_idx],
+                                         correspondences.points_2[essential_inliers_idx], intrinsic_mat)
+
+    return  mask_essential.mean() - mask_homography.mean() * 0.5, R, t
+
+
+def find_initial_frames(corner_storage,
+                      intrinsic_mat):
+    retval_default = 0
+    n1 = -1
+    n2 = -1
+    Ro, to = None, None
+    for i in range(0, min(40, len(corner_storage) // 4), 4):
+        for j in range(i + 10, min(100, len(corner_storage) // 2), 4):
+            retval, R, t = calculate_for_2_frames(intrinsic_mat, corner_storage, i, j)
+            if retval > retval_default:
+                n1, n2 = i ,j
+                retval_default = retval
+                Ro = R
+                to = t
+
+    return (n1, view_mat3x4_to_pose(eye3x4())), (n2, Pose(Ro.T, Ro.T @ -to))
+
+
+
 def track_and_calc_colors(camera_parameters: CameraParameters,
                           corner_storage: CornerStorage,
                           frame_sequence_path: str,
                           known_view_1: Optional[Tuple[int, Pose]] = None,
                           known_view_2: Optional[Tuple[int, Pose]] = None) \
         -> Tuple[List[Pose], PointCloud]:
-    if known_view_1 is None or known_view_2 is None:
-        raise NotImplementedError()
-
     rgb_sequence = frameseq.read_rgb_f32(frame_sequence_path)
     intrinsic_mat = to_opencv_camera_mat3x3(
         camera_parameters,
         rgb_sequence[0].shape[0]
     )
+
+    if known_view_1 is None or known_view_2 is None:
+        known_view_1, known_view_2 = find_initial_frames(corner_storage, intrinsic_mat)
 
     def select_2d_points(id_, arr_frames_):
         arr_2d_points_ = []
@@ -262,8 +302,8 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
     view_mats = []
     # t_vec_prev = None
     # r_vec_prev = None
-    r_vec_prev = view_mat3x4_to_rodrigues_and_translation(pose_to_view_mat3x4(known_view_1[1]))[0]
-    t_vec_prev = view_mat3x4_to_rodrigues_and_translation(pose_to_view_mat3x4(known_view_1[1]))[1]
+    r_vec_prev = view_mat3x4_to_rodrigues_and_translation(pose_to_view_mat3x4(known_view_1[1]))[0].copy()
+    t_vec_prev = view_mat3x4_to_rodrigues_and_translation(pose_to_view_mat3x4(known_view_1[1]))[1].copy()
     storage_points_3d[2] = np.array([True] * storage_points_3d[0].shape[0])
     standart_repr_error = 3
     max_repr_error = 8
@@ -272,7 +312,7 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
     i = 0
     while i < len(corner_storage):
         retval, r_vec, t_vec, ids_outliers = pnp_by_frame_number(storage_points_3d, i, True,
-                                                                 t_vec_prev, r_vec_prev, True,
+                                                                 t_vec_prev.copy(), r_vec_prev.copy(), True,
                                                                  rep_error)
         if not retval:  # or ids_outliers.size < 10 если не получается пробуем доделать хоть как-то
             rep_error += 1
@@ -283,8 +323,7 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
 
         for j in ids_outliers:
             storage_points_3d[2][np.argwhere(storage_points_3d[1] == j)[0, 0]] = False
-        # if np.linalg.norm(r_vec - r_vec_prev) > 0.001:
-        # if i > 3:
+        # if i > 3 and np.linalg.norm(r_vec - r_vec_prev) > 0.001: #0.00115:
         #     r_vec = r_vec_prev
         #     t_vec = t_vec_prev
 
