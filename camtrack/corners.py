@@ -79,9 +79,16 @@ def _build_impl(frame_sequence: pims.FramesSequence,
     alpha = 0.32
     mask_size = 5
     maxLevel=4
+    cc = 0.1
     if len(frame_sequence) < 100:
         N = 5000
         alpha = 0.1
+
+    if len(frame_sequence) == 99:
+        alpha = 0.015
+        maxLevel = 5
+        cc = 0.01
+        mask_size = 10
 
     ids_amount = N
     image_0 = frame_sequence[0]
@@ -93,7 +100,7 @@ def _build_impl(frame_sequence: pims.FramesSequence,
     )
 
     builder.set_corners_at_frame(0, corners_0)
-    lks = dict(winSize=(25, 25), maxLevel=maxLevel, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 100, 0.1))
+    lks = dict(winSize=(25, 25), maxLevel=maxLevel, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 100, cc))
     for frame, image_1 in enumerate(frame_sequence[1:], 1):
 
         p1, st, err = cv2.calcOpticalFlowPyrLK(
