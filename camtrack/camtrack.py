@@ -42,6 +42,8 @@ def calculate_for_2_frames(intrinsic_mat: np.ndarray,
                            second_frame: int):
     correspondences = build_correspondences(corner_storage[first_frame],
                                             corner_storage[second_frame])
+    if len(correspondences.ids) < 5:
+        return -1, None, None
     H, mask_homography = cv2.findHomography(correspondences.points_1, correspondences.points_2, cv2.RANSAC)
 
     E, mask_essential = cv2.findEssentialMat(correspondences.points_1, correspondences.points_2,
