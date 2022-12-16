@@ -80,7 +80,11 @@ def _build_impl(frame_sequence: pims.FramesSequence,
     mask_size = 5
     maxLevel=4
     cc = 0.1
-    if len(frame_sequence) < 100:
+    if len(frame_sequence) < 30:
+        N = 3000
+        alpha = 0.18
+
+    if 100 > len(frame_sequence) > 80:
         N = 5000
         alpha = 0.1
 
