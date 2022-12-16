@@ -93,7 +93,7 @@ def _build_impl(frame_sequence: pims.FramesSequence,
     )
 
     builder.set_corners_at_frame(0, corners_0)
-    lks = dict(winSize=(25, 25), maxLevel=maxLevel, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 100, 0.01))
+    lks = dict(winSize=(25, 25), maxLevel=maxLevel, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 100, 0.1))
     for frame, image_1 in enumerate(frame_sequence[1:], 1):
 
         p1, st, err = cv2.calcOpticalFlowPyrLK(
