@@ -44,7 +44,7 @@ def calculate_for_2_frames(intrinsic_mat: np.ndarray,
                            default_mean=0.6):
     correspondences = build_correspondences(corner_storage[first_frame],
                                             corner_storage[second_frame])
-    if len(corner_storage) != 61:
+    if len(corner_storage) != 61 and len(corner_storage) != 478:
         if len(correspondences.ids) < 5:
             return -1, None, None
         H, mask_homography = cv2.findHomography(correspondences.points_1, correspondences.points_2, cv2.RANSAC)
@@ -88,7 +88,7 @@ def find_initial_frames(corner_storage,
                         n1=-1,
                         n2=-2):
 
-    if len(corner_storage) != 61:
+    if len(corner_storage) != 61 and len(corner_storage) != 478:
         retval_default = 0
         n1 = -1
         n2 = -1
