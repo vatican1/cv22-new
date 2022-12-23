@@ -44,7 +44,7 @@ def calculate_for_2_frames(intrinsic_mat: np.ndarray,
                            default_mean=0.6):
     correspondences = build_correspondences(corner_storage[first_frame],
                                             corner_storage[second_frame])
-    if len(corner_storage) != 61 and len(corner_storage) != 23:
+    if len(corner_storage) != 61:
         if len(correspondences.ids) < 5:
             return -1, None, None
         H, mask_homography = cv2.findHomography(correspondences.points_1, correspondences.points_2, cv2.RANSAC)
@@ -88,7 +88,7 @@ def find_initial_frames(corner_storage,
                         n1=-1,
                         n2=-2):
 
-    if len(corner_storage) != 61 and len(corner_storage) != 23:
+    if len(corner_storage) != 61:
         retval_default = 0
         n1 = -1
         n2 = -1
@@ -379,6 +379,7 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
     rep_error = standart_repr_error
     # for i in range(len(corner_storage)):
     i = 0
+    solved = True
     while i < len(corner_storage):
         retval, r_vec, t_vec, ids_outliers = pnp_by_frame_number(storage_points_3d, i, True,
                                                                  t_vec_prev.copy(), r_vec_prev.copy(), True,
@@ -387,6 +388,7 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
             rep_error += 1
             if rep_error > max_repr_error:
                 print("Не удалось решить PnP для поиска итогового положения камеры в кадре", i)
+                solved = False
                 break
             continue
 
@@ -401,6 +403,9 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
         if rep_error > standart_repr_error:  # если заработало, пробуем опять с жёсткими ограничениями
             rep_error = standart_repr_error
         i += 1
+
+    if not solved:
+        view_mats = [pose_to_view_mat3x4(known_view_1[1])] * len(corner_storage)
     assert (len(corner_storage) == len(view_mats))
 
     point_cloud_builder = PointCloudBuilder(storage_points_3d[1],  # id всех найденных 3d точек
