@@ -75,24 +75,11 @@ def near_points(dot, img, size):
 def _build_impl(frame_sequence: pims.FramesSequence,
                 builder: _CornerStorageBuilder) -> None:
     corners_1 = None
-    N = 600
-    alpha = 0.32
+    N = 5000
+    alpha = 0.12
     mask_size = 5
     maxLevel=4
-    cc = 0.1
-    if len(frame_sequence) < 30:
-        N = 3000
-        alpha = 0.18
-
-    if 100 > len(frame_sequence) > 80:
-        N = 5000
-        alpha = 0.1
-
-    if len(frame_sequence) == 99:
-        alpha = 0.015
-        maxLevel = 5
-        cc = 0.01
-        mask_size = 10
+    cc = 0.01
 
     ids_amount = N
     image_0 = frame_sequence[0]
