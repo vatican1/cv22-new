@@ -76,10 +76,10 @@ def _build_impl(frame_sequence: pims.FramesSequence,
                 builder: _CornerStorageBuilder) -> None:
     corners_1 = None
     N = 5000
-    alpha = 0.12
+    alpha = 0.08
     mask_size = 5
-    maxLevel=4
-    cc = 0.01
+    maxLevel = 4
+    cc = 0.1
 
     ids_amount = N
     image_0 = frame_sequence[0]
