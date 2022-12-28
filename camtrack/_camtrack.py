@@ -252,7 +252,7 @@ def rodrigues_and_translation_to_view_mat3x4(r_vec: np.ndarray,
 
 
 def view_mat3x4_to_rodrigues_and_translation(view_mat: np.ndarray) -> (np.ndarray, np.ndarray):
-    t_vec = view_mat[:, 3].reshape(1, 3)  # .flatten()
+    t_vec = view_mat[:, 3].reshape(3, 1)
     r_vec = cv2.Rodrigues(view_mat[:, :3])[0]
     return r_vec, t_vec
 
