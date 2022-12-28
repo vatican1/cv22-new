@@ -79,6 +79,7 @@ def find_3d_2d_masks(ids_3d, ids_2d):
             if id_i == id_j:
                 mask3d[i] = True
                 mask2d[j] = True
+                break
     return mask3d, mask2d
 
 
@@ -94,15 +95,17 @@ def frame_to_add(storage_points_3d, storage_points_2d: FrameCorners, rvec_prev, 
     points_3d, points_2d = storage_points_3d[0][mask3d], storage_points_2d.points[mask2d]
 
     # if rvec_prev is None:
-    #     retval, r_vec, t_vec, inliers = cv2.solvePnPRansac(points_3d, points_2d, intrinsic_mat, np.array([]),
-    #                                                        reprojectionError=repr_err,
-    #                                                        iterationsCount=1000, confidence=0.99999)
+    # retval, r_vec, t_vec, inliers = cv2.solvePnPRansac(points_3d, points_2d, intrinsic_mat, np.array([]),
+    #                                                    reprojectionError=repr_err)
     # else:
-    retval, r_vec, t_vec, inliers = cv2.solvePnPRansac(points_3d, points_2d, intrinsic_mat, np.array([]),
+    retval, r_vec, t_vec, inliers = cv2.solvePnPRansac(objectPoints=points_3d,
+                                                       imagePoints=points_2d,
+                                                       cameraMatrix=intrinsic_mat,
+                                                       distCoeffs=np.array([]),
                                                        reprojectionError=repr_err,
                                                        useExtrinsicGuess=True,
-                                                       rvec=rvec_prev.copy(), tvec=tvec_prev.copy(),
-                                                       iterationsCount=1000, confidence=0.99999)
+                                                       rvec=rvec_prev.copy(),
+                                                       tvec=tvec_prev.copy())
 
     if retval:
         ids_outliers = []
@@ -118,8 +121,8 @@ def add_to_strorage(storage_points_3d, new_points_3d, ids):
     if len(ids) != 0:
         new_3d_points_mask = np.array([True if i not in storage_points_3d[1] else False for i in ids])
         if new_points_3d[new_3d_points_mask].shape[0] != 0:
-            storage_points_3d[0] = np.vstack((storage_points_3d[0], new_points_3d[new_3d_points_mask]))
-            storage_points_3d[1] = np.hstack((storage_points_3d[1], ids[new_3d_points_mask]))
+            storage_points_3d[0] = np.vstack((storage_points_3d[0].copy(), new_points_3d[new_3d_points_mask]))
+            storage_points_3d[1] = np.hstack((storage_points_3d[1].copy(), ids[new_3d_points_mask]))
             print("Облако 3d точек увеличилось до -", len(storage_points_3d[0]))
     return storage_points_3d
 
@@ -127,9 +130,10 @@ def add_to_strorage(storage_points_3d, new_points_3d, ids):
 def find_nerest_frame(i, known_views):
     ret_ = known_views[0]
     min_ = abs(ret_ - i)
-    for i in known_views:
-        if abs(i - ret_) < min_:
-            ret_ = i
+    for j in known_views:
+        if abs(i - j) < min_:
+            ret_ = j
+            min_ = abs(i - j)
     return ret_
 
 
@@ -161,7 +165,7 @@ def calculate_for_2_frames(intrinsic_mat: np.ndarray,
 
     _, ids, median_cos = triangulate_correspondences(correspondences, eye3x4(),
                                                      pose_to_view_mat3x4(Pose(R.T, R.T @ -t)),
-                                                     intrinsic_mat, TriangulationParameters(1.5, 9, 2))
+                                                     intrinsic_mat, TriangulationParameters(1.5, 5, 2))
 
     if len(ids) < bound:
         return False, None, None, None
@@ -231,7 +235,7 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
                                                                  pose_to_view_mat3x4(known_view_1[1]),
                                                                  pose_to_view_mat3x4(known_view_2[1]),
                                                                  intrinsic_mat,
-                                                                 TriangulationParameters(1.5, 4, 2)
+                                                                 TriangulationParameters(1.5, 5, 2)
                                                                  )  # сделали триангуляцию соответствия
 
     storage_points_3d = [new_points_3d, ids]  # тут храним все полученные 3d точки
@@ -270,7 +274,7 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
         print("размер облака - ", len(storage_points_3d[0]))
         for frame_number in range(0, len(corner_storage), shift):
             frame_nearest_number = find_nerest_frame(frame_number, known_views_numbers)
-            retval, pose, _, r_v, t_v = frame_to_add(storage_points_3d, corner_storage[frame_number],
+            retval, pose, _, r_v, t_v = frame_to_add(storage_points_3d.copy(), corner_storage[frame_number],
                                                      known_r_vec_t_vec[frame_nearest_number][0].copy(),
                                                      known_r_vec_t_vec[frame_nearest_number][1].copy(),
                                                      intrinsic_mat,
@@ -302,7 +306,8 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
                                                                pose_to_view_mat3x4(known_views[right]),
                                                                intrinsic_mat)
                 if retval:
-                    storage_points_3d = add_to_strorage(storage_points_3d, new_points_3d, ids)
+                    storage_points_3d = add_to_strorage(storage_points_3d.copy(), new_points_3d.copy(),
+                                                        ids.copy()).copy()
                     # добавились ли новые известные 3d точки
                     flag_change |= (storage_points_3d_len_prev != len(storage_points_3d[0]))
                     storage_points_3d_len_prev = len(storage_points_3d[0])
@@ -310,19 +315,23 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
                 else:
                     pass
                     # print("на кадрах:", left, right, "НЕ удалось увеличить облако 3d точек")
-
-    inliers_storage_points_3d = np.array([True] * storage_points_3d[0].shape[0])
+                if j1 >= 1:
+                    break
+            break
+    print("Итоговое облако 3d точек - ", len(storage_points_3d[0]))
+    inliers_storage_points_3d = np.array([True] * len(storage_points_3d[1]))
     view_mats = []
     for i in range(len(corner_storage)):
 
-        storage_points_3d[0] = storage_points_3d[0][inliers_storage_points_3d]
-        storage_points_3d[1] = storage_points_3d[1][inliers_storage_points_3d]
+        # storage_points_3d[0] = storage_points_3d[0][inliers_storage_points_3d]
+        # storage_points_3d[1] = storage_points_3d[1][inliers_storage_points_3d]
 
         frame_nearest_number = find_nerest_frame(i, known_views_numbers)
         retval, pose, ids_outliers, _, _ = frame_to_add(storage_points_3d, corner_storage[i],
-                                                        known_r_vec_t_vec[frame_nearest_number][0],
-                                                        known_r_vec_t_vec[frame_nearest_number][1],
-                                                        intrinsic_mat, 4, 3)
+                                                        known_r_vec_t_vec[frame_nearest_number][0].copy(),
+                                                        known_r_vec_t_vec[frame_nearest_number][1].copy(),
+                                                        intrinsic_mat, 4, 4)
+
         if not ids_outliers:
             pass
         else:
@@ -333,21 +342,12 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
             print("для кадра", i, "УДАЛОСЬ решить PnP задачу")
             view_mats.append(pose_to_view_mat3x4(pose))
         else:
-            retval, pose, ids_outliers, _, _ = frame_to_add(storage_points_3d, corner_storage[i],
-                                                            known_r_vec_t_vec[frame_nearest_number][0],
-                                                            known_r_vec_t_vec[frame_nearest_number][1],
-                                                            intrinsic_mat,
-                                                            4, 4)
-            if retval:
-                print("для кадра", i, "УДАЛОСЬ решить PnP задачу")
-                view_mats.append(pose_to_view_mat3x4(pose))
+            print("для кадра", i, "НЕ удалось решить PnP задачу")
+            if len(view_mats) != 0:
+                view_mats.append(view_mats[-1])
             else:
-                print("для кадра", i, "НЕ удалось решить PnP задачу")
-                if len(view_mats) != 0:
-                    view_mats.append(view_mats[-1])
-                else:
-                    frame_nearest_number = find_nerest_frame(i, known_views_numbers)
-                    view_mats.append(pose_to_view_mat3x4(known_views[frame_nearest_number]))
+                frame_nearest_number = find_nerest_frame(i, known_views_numbers)
+                view_mats.append(pose_to_view_mat3x4(known_views[frame_nearest_number]))
 
     assert (len(corner_storage) == len(view_mats))
     point_cloud_builder = PointCloudBuilder(storage_points_3d[1],  # id всех найденных 3d точек
