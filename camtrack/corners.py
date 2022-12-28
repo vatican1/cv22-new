@@ -75,11 +75,11 @@ def near_points(dot, img, size):
 def _build_impl(frame_sequence: pims.FramesSequence,
                 builder: _CornerStorageBuilder) -> None:
     corners_1 = None
-    N = 5000
-    alpha = 0.08
+    N = 6000
+    alpha = 0.01
     mask_size = 5
     maxLevel = 4
-    cc = 0.1
+
 
     ids_amount = N
     image_0 = frame_sequence[0]
@@ -91,7 +91,7 @@ def _build_impl(frame_sequence: pims.FramesSequence,
     )
 
     builder.set_corners_at_frame(0, corners_0)
-    lks = dict(winSize=(25, 25), maxLevel=maxLevel, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 100, cc))
+    lks = dict(winSize=(20, 20), maxLevel=maxLevel, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 100, 0.1))
     for frame, image_1 in enumerate(frame_sequence[1:], 1):
 
         p1, st, err = cv2.calcOpticalFlowPyrLK(
