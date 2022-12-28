@@ -54,7 +54,7 @@ def try_add_3d_points(median_angel_, left: FrameCorners, right: FrameCorners, le
                                                                  left_view_mat,
                                                                  right_view_mat,
                                                                  intrinsic_mat,
-                                                                 TriangulationParameters(2.5, 5, 1)
+                                                                 TriangulationParameters(2.5, 2, 0)
                                                                  # 'max_reprojection_error', 'min_triangulation_angle_deg', 'min_depth'
                                                                  )
     if len(ids) != 0 and np.arccos(median_cos) > median_angel_:
@@ -84,7 +84,7 @@ def find_3d_2d_masks(ids_3d, ids_2d):
 
 
 def frame_to_add(storage_points_3d, storage_points_2d: FrameCorners, rvec_prev, tvec_prev, intrinsic_mat: np.ndarray,
-                 amount_correspondences: int, repr_err=2.0):
+                 amount_correspondences: int, repr_err=2.5):
     ids_3d = storage_points_3d[1]
     ids_2d = storage_points_2d.ids.flatten()
 
@@ -248,25 +248,23 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
     flag_change = True
     iter = 0
 
-    def_median_cos = np.pi / 40
+    def_median_a= np.pi / 40
     def_amount_correspondenses = 200
 
-    median_cos = def_median_cos
+    median_a = def_median_a
     amount_correspondenses = def_amount_correspondenses
     while len(known_views_numbers) < len(corner_storage) // shift + add_frames:
-        left_boarder = min(known_views_numbers)
-        right_boarder = max(known_views_numbers)
         if not flag_change:
-            print("ничего не изменилось!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
-            median_cos /= 1.3
+            print("ничего не изменилось!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            median_a /= 1.3
             if amount_correspondenses > 25:
                 amount_correspondenses -= 15
         else:
-            median_cos = def_median_cos
+            median_a = def_median_a
             amount_correspondenses = def_amount_correspondenses
 
         flag_change = False
-        if iter >= 1:
+        if iter >= 10:
             print("всё слишком плохо!")
             break
         iter += 1
@@ -300,7 +298,7 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
             for j1, right in enumerate(known_views_numbers[::-1]):
                 if len(known_views_numbers) - 1 - j1 <= i1:
                     break
-                retval, new_points_3d, ids = try_add_3d_points(median_cos, corner_storage[left],
+                retval, new_points_3d, ids = try_add_3d_points(median_a, corner_storage[left],
                                                                corner_storage[right],
                                                                pose_to_view_mat3x4(known_views[left]),
                                                                pose_to_view_mat3x4(known_views[right]),
@@ -308,6 +306,7 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
                 if retval:
                     storage_points_3d = add_to_strorage(storage_points_3d.copy(), new_points_3d.copy(),
                                                         ids.copy()).copy()
+                    # storage_points_3d = sort_3d(storage_points_3d)
                     # добавились ли новые известные 3d точки
                     flag_change |= (storage_points_3d_len_prev != len(storage_points_3d[0]))
                     storage_points_3d_len_prev = len(storage_points_3d[0])
@@ -315,9 +314,9 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
                 else:
                     pass
                     # print("на кадрах:", left, right, "НЕ удалось увеличить облако 3d точек")
-                if j1 >= 1:
-                    break
-            break
+                # if j1 >= 1:
+                #     break
+            # break
     print("Итоговое облако 3d точек - ", len(storage_points_3d[0]))
     inliers_storage_points_3d = np.array([True] * len(storage_points_3d[1]))
     view_mats = []
@@ -327,10 +326,13 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
         # storage_points_3d[1] = storage_points_3d[1][inliers_storage_points_3d]
 
         frame_nearest_number = find_nerest_frame(i, known_views_numbers)
-        retval, pose, ids_outliers, _, _ = frame_to_add(storage_points_3d, corner_storage[i],
+        retval, pose, ids_outliers, _, _ = frame_to_add(storage_points_3d.copy(), corner_storage[i],
                                                         known_r_vec_t_vec[frame_nearest_number][0].copy(),
                                                         known_r_vec_t_vec[frame_nearest_number][1].copy(),
-                                                        intrinsic_mat, 4, 4)
+                                                        intrinsic_mat, 4, 3)
+        if i in known_views_numbers:
+            view_mats.append(pose_to_view_mat3x4(known_views[i]))
+            continue
 
         if not ids_outliers:
             pass
@@ -343,11 +345,7 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
             view_mats.append(pose_to_view_mat3x4(pose))
         else:
             print("для кадра", i, "НЕ удалось решить PnP задачу")
-            if len(view_mats) != 0:
-                view_mats.append(view_mats[-1])
-            else:
-                frame_nearest_number = find_nerest_frame(i, known_views_numbers)
-                view_mats.append(pose_to_view_mat3x4(known_views[frame_nearest_number]))
+            view_mats.append(pose_to_view_mat3x4(known_views[frame_nearest_number]))
 
     assert (len(corner_storage) == len(view_mats))
     point_cloud_builder = PointCloudBuilder(storage_points_3d[1],  # id всех найденных 3d точек
