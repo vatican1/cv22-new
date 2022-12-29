@@ -186,8 +186,8 @@ def find_initial_frames(corner_storage,
     bound = 80
     while n1 == -1 and bound > 10:
         print("считаю с ограничением в ", bound, "соответствий между кадрами")
-        for i in range(0, len(corner_storage) // 2, 3):
-            for j in range(i + 3, len(corner_storage) // 2, 3):
+        for i in range(0, len(corner_storage), 3):
+            for j in range(i + 3, len(corner_storage), 3):
                 retval, metric, R, t = calculate_for_2_frames(intrinsic_mat, corner_storage, i, j, bound)
                 if retval and metric > max_metric:
                     n1, n2 = i, j
